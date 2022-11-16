@@ -1,0 +1,161 @@
+/*
+ * Mini_Project2.c
+ *
+ *  Created on: Sep 15, 2022
+ *      Author: Abdelrahman Ali 
+ */
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+
+unsigned char g_sec1 = 0;
+unsigned char g_sec2 = 0;
+unsigned char g_min1 = 0;
+unsigned char g_min2 = 0;
+unsigned char g_hour1 = 0;
+unsigned char g_hour2 = 0;
+
+void Timer1_init();
+void INT0_init();
+void INT1_init();
+void INT2_init();
+void ioInitialization();
+void handleDisplay();
+void displayStopWatch ();
+
+ISR(TIMER1_COMPA_vect) {
+	handleDisplay();
+}
+
+ISR(INT0_vect) {      // reseting all the variables values to 0 to reset the stop watch
+		SREG = (1 << 7);
+		g_sec1 = 0 ;
+		g_sec2 = 0 ;
+		g_min1 = 0 ;
+		g_min2 = 0 ;
+		g_hour1 = 0 ;
+		g_hour2 = 0 ;
+}
+
+ISR(INT1_vect) {    // Pause the stop watch by pausing the clock
+	SREG = (1 << 7);
+	TCCR1B &= ~(1<<CS10) &~(1<<CS11) &~(1<<CS12);
+
+}
+
+
+ISR(INT2_vect) {  // resume the stop watch by resuming the clock
+
+		SREG = (1 << 7);
+		TCCR1B |= (1<<CS10) | (1<<CS12) ;
+}
+
+
+
+
+
+
+void Timer1_init() {
+	TCNT1 = 0;
+	OCR1A = 977;
+	TCCR1A = (1 << FOC1A) ;
+	TCCR1B = (1 << CS10) | (1 << CS12)| (1 << WGM12);
+	TIMSK |= (1 << OCIE1A);
+	SREG = (1 << 7);
+}
+
+void INT0_init() {
+	DDRD &= ~(1 << PD2);        // PD2 is input pin
+	PORTD |= (1 << PD2);       // enable internal pull up
+	GICR |= (1 << INT0);      // INT0 enable
+	SREG |= (1 << 7);        //global interrupt enable
+	MCUCR |= (1 << ISC01);  //falling edge of INT0
+}
+
+void INT1_init() {
+	DDRD &= ~(1 << PD3);       // PD3 is input pin
+	GICR |= (1 << INT1);                 // INT1 enable
+	SREG |= (1 << 7);                   //global interrupt enable
+	MCUCR |= (1 << ISC11) | (1 << ISC10);  //rising edge of INT1
+}
+
+void INT2_init() {
+	DDRB &= ~(1 << PB2);       // PB2 is input pin
+	PORTB |= (1 << PB2);       // enable internal pull up
+	GICR |= (1 << INT2);  	 // INT2 enable
+	SREG |= (1 << 7);    		//global interrupt enable
+	MCUCSR &= ~(1 << ISC2);  //falling edge of INT2
+}
+
+
+void ioInitialization() {
+	DDRC |= 0x0F;      //First 4 pins of PortC are output pins
+	DDRA |= 0x3F; //First 6 pins of PortA are output pins ( Enable and Disable )
+	PORTC &= 0xF0;   // show 0 at first
+}
+
+void handleDisplay(){
+		g_sec1++;
+		if (g_sec1 > 9) {
+			g_sec1 = 0;
+			g_sec2++;
+		}
+		if (g_sec2 > 5) {
+			g_sec2 = 0;
+			g_min1++;
+		}
+		if (g_min1 > 9) {
+			g_min1 = 0;
+			g_min2++;
+		}
+		if (g_min2 > 5) {
+			g_min2 = 0;
+			g_hour1++;
+		}
+		if (g_hour1 > 9) {
+			g_hour1 = 0;
+			g_hour2++;
+		}
+		if (g_hour2 > 9) {
+			g_hour2 = 0;
+		}
+
+}
+
+
+void displayStopWatch (){
+	PORTA = (PORTA & 0xC0) | (1<<PA0);
+	PORTC = (PORTC & 0xF0) | (g_sec1);
+	_delay_us(500);
+	PORTA = (PORTA & 0xC0) | (1<<PA1);
+	PORTC = (PORTC & 0xF0) | (g_sec2);
+	_delay_us(500);
+	PORTA = (PORTA & 0xC0) | (1<<PA2);
+	PORTC = (PORTC & 0xF0) | (g_min1);
+	_delay_us(500);
+	PORTA = (PORTA & 0xC0) | (1<<PA3);
+	PORTC = (PORTC & 0xF0) | (g_min2);
+	_delay_us(500);
+	PORTA = (PORTA & 0xC0) | (1<<PA4);
+	PORTC = (PORTC & 0xF0) | (g_hour1);
+	_delay_us(500);
+	PORTA = (PORTA & 0xC0) | (1<<PA5);
+	PORTC = (PORTC & 0xF0) | (g_hour2);
+	_delay_us(500);
+}
+int main(void) {
+
+	ioInitialization();    //initialization of ports
+	Timer1_init();        //initialization of timer1
+	INT0_init();  		 //interrupt0 initialization
+	INT1_init();   		//interrupt1 initialization
+	INT2_init();  	   //interrupt2 initialization
+
+	while (1) {
+
+		displayStopWatch ();
+
+	}
+
+}
